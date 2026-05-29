@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./model/experiments:/app/experiments:ro  # mount trained model
+    environment:
+      - MODEL_PATH=/app/experiments/best_model.pt
+      - METADATA_PATH=/app/experiments/metadata.json
+      - CLASS_NAMES_PATH=/app/experiments/class_names.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
