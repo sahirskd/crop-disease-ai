@@ -11,3 +11,6 @@ plantdisease.zip
 **cropsense.db
 
 **experiments
+
+frontend/node_modules
+frontend/package-lock.json
