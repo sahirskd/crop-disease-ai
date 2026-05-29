@@ -10,7 +10,10 @@ export async function predictDisease(imageFile) {
   });
 
   if (!res.ok) {
-    const err = await res.json();
+    if (res.status === 429) {
+      throw new Error("Too many requests. Please wait a moment and try again.");
+    }
+    const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Prediction failed");
   }
   return res.json();

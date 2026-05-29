@@ -27,8 +27,16 @@ def get_predictor() -> CropDiseasePredictor:
     return _predictor
 
 
+import logging
+from app.core.limiter import limiter
+from fastapi import Request
+
+logger = logging.getLogger(__name__)
+
 @router.post("/predict", response_model=PredictionResponse)
+@limiter.limit("10/minute")
 async def predict(
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     predictor: CropDiseasePredictor = Depends(get_predictor),
@@ -43,7 +51,8 @@ async def predict(
 
     try:
         image = Image.open(io.BytesIO(contents))
-    except Exception:
+    except Exception as e:
+        logger.error(f"Invalid image file uploaded: {e}")
         raise HTTPException(status_code=400, detail="Invalid image file")
 
     result = predictor.predict(image)

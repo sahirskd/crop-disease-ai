@@ -1,0 +1,13 @@
+.venv
+.agent
+openspec
+.agents
+
+**/data
+**/plantvillage
+plantdisease.zip
+
+**__pycache__
+**cropsense.db
+
+**experiments

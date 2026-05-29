@@ -3,6 +3,7 @@ import UploadPage from "./pages/UploadPage";
 import ResultPage from "./pages/ResultPage";
 import HistoryPage from "./pages/HistoryPage";
 import Navbar from "./components/Navbar";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   const [page, setPage] = useState("upload"); // "upload" | "result" | "history"
@@ -14,13 +15,15 @@ export default function App() {
   };
 
   return (
-    <div className="app">
-      <Navbar page={page} setPage={setPage} />
-      <main>
-        {page === "upload" && <UploadPage onResult={handleResult} />}
-        {page === "result" && <ResultPage result={result} onBack={() => setPage("upload")} />}
-        {page === "history" && <HistoryPage />}
-      </main>
-    </div>
+    <ErrorBoundary>
+      <div className="app">
+        <Navbar page={page} setPage={setPage} />
+        <main>
+          {page === "upload" && <UploadPage onResult={handleResult} />}
+          {page === "result" && <ResultPage result={result} onBack={() => setPage("upload")} />}
+          {page === "history" && <HistoryPage />}
+        </main>
+      </div>
+    </ErrorBoundary>
   );
 }
