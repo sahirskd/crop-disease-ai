@@ -80,13 +80,14 @@ def get_dataloaders(data_dir: str, img_size: int, batch_size: int,
     val_ds.dataset.transform = get_transforms(img_size, "val")
     test_ds.dataset.transform = get_transforms(img_size, "test")
 
+    pin_memory = torch.cuda.is_available()
     loaders = {
         "train": DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                            num_workers=4, pin_memory=True),
+                            num_workers=4, pin_memory=pin_memory),
         "val": DataLoader(val_ds, batch_size=batch_size, shuffle=False,
-                          num_workers=4, pin_memory=True),
+                          num_workers=4, pin_memory=pin_memory),
         "test": DataLoader(test_ds, batch_size=batch_size, shuffle=False,
-                           num_workers=4, pin_memory=True),
+                           num_workers=4, pin_memory=pin_memory),
     }
     return loaders, class_names
 
