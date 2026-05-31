@@ -194,41 +194,53 @@ def main():
     scaler = torch.cuda.amp.GradScaler(enabled=(str(device) == "cuda"))
 
     # Phase 1: Train head only
-    freeze_backbone(model, args.model)
-    optimizer = AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.freeze_epochs)
-
-    print(f"\n── Phase 1: Training head for {args.freeze_epochs} epochs ──")
-    for epoch in range(args.freeze_epochs):
-        train_loss, train_acc = train_one_epoch(model, loaders["train"], optimizer, criterion, device, scaler)
-        val_loss, val_acc = evaluate(model, loaders["val"], criterion, device)
-        scheduler.step()
-        print(f"Epoch {epoch+1:02d} | train_loss={train_loss:.4f} acc={train_acc:.4f} | val_loss={val_loss:.4f} acc={val_acc:.4f}")
-        if args.use_wandb:
-            wandb.log({"train_loss": train_loss, "train_acc": train_acc,
-                       "val_loss": val_loss, "val_acc": val_acc, "phase": 1})
-
-    # Phase 2: Fine-tune full model
-    unfreeze_all(model)
-    optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs - args.freeze_epochs)
+    freeze_epochs = min(args.freeze_epochs, args.epochs)
+    fine_tune_epochs = args.epochs - freeze_epochs
 
     best_val_acc = 0.0
-    print(f"\n── Phase 2: Full fine-tuning for {args.epochs - args.freeze_epochs} epochs ──")
-    for epoch in range(args.epochs - args.freeze_epochs):
-        train_loss, train_acc = train_one_epoch(model, loaders["train"], optimizer, criterion, device, scaler)
-        val_loss, val_acc = evaluate(model, loaders["val"], criterion, device)
-        scheduler.step()
-        print(f"Epoch {epoch+1:02d} | train_loss={train_loss:.4f} acc={train_acc:.4f} | val_loss={val_loss:.4f} acc={val_acc:.4f}")
+    torch.save(model.state_dict(), output_dir / "best_model.pt")
 
-        if args.use_wandb:
-            wandb.log({"train_loss": train_loss, "train_acc": train_acc,
-                       "val_loss": val_loss, "val_acc": val_acc, "phase": 2})
+    if freeze_epochs > 0:
+        freeze_backbone(model, args.model)
+        optimizer = AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+        scheduler = CosineAnnealingLR(optimizer, T_max=freeze_epochs)
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            torch.save(model.state_dict(), output_dir / "best_model.pt")
-            print(f"  ✅ Saved best model (val_acc={val_acc:.4f})")
+        print(f"\n── Phase 1: Training head for {freeze_epochs} epochs ──")
+        for epoch in range(freeze_epochs):
+            train_loss, train_acc = train_one_epoch(model, loaders["train"], optimizer, criterion, device, scaler)
+            val_loss, val_acc = evaluate(model, loaders["val"], criterion, device)
+            scheduler.step()
+            print(f"Epoch {epoch+1:02d} | train_loss={train_loss:.4f} acc={train_acc:.4f} | val_loss={val_loss:.4f} acc={val_acc:.4f}")
+            if args.use_wandb:
+                wandb.log({"train_loss": train_loss, "train_acc": train_acc,
+                           "val_loss": val_loss, "val_acc": val_acc, "phase": 1})
+            
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                torch.save(model.state_dict(), output_dir / "best_model.pt")
+                print(f"  ✅ Saved best model (val_acc={val_acc:.4f})")
+
+    # Phase 2: Fine-tune full model
+    if fine_tune_epochs > 0:
+        unfreeze_all(model)
+        optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+        scheduler = CosineAnnealingLR(optimizer, T_max=fine_tune_epochs)
+
+        print(f"\n── Phase 2: Full fine-tuning for {fine_tune_epochs} epochs ──")
+        for epoch in range(fine_tune_epochs):
+            train_loss, train_acc = train_one_epoch(model, loaders["train"], optimizer, criterion, device, scaler)
+            val_loss, val_acc = evaluate(model, loaders["val"], criterion, device)
+            scheduler.step()
+            print(f"Epoch {epoch+1:02d} | train_loss={train_loss:.4f} acc={train_acc:.4f} | val_loss={val_loss:.4f} acc={val_acc:.4f}")
+
+            if args.use_wandb:
+                wandb.log({"train_loss": train_loss, "train_acc": train_acc,
+                           "val_loss": val_loss, "val_acc": val_acc, "phase": 2})
+
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                torch.save(model.state_dict(), output_dir / "best_model.pt")
+                print(f"  ✅ Saved best model (val_acc={val_acc:.4f})")
 
     # Final test evaluation
     model.load_state_dict(torch.load(output_dir / "best_model.pt"))
